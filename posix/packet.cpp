@@ -1,0 +1,377 @@
+//////////////////////////////////////////////////////////////////////
+// packet.cpp -- Implementation of Packet Data Marshaller
+// Date: Fri Jul 11 19:23:28 2014  (C) Warren Gay VE3WWG
+///////////////////////////////////////////////////////////////////////
+
+#include <stdlib.h>
+#include <memory.h>
+#include <assert.h>
+
+#include "packet.hpp"
+
+//////////////////////////////////////////////////////////////////////
+// Constructor: Open a buffer/packet for I/O
+//////////////////////////////////////////////////////////////////////
+
+Packet::Packet(void *buffer,size_t buflen) {
+	this->buffer = (uint8_t *)buffer;
+	this->buflen = this->maxlen = buflen;
+	rewind();
+}
+
+//////////////////////////////////////////////////////////////////////
+// Rewind the buffer pointer
+//////////////////////////////////////////////////////////////////////
+
+void
+Packet::rewind() {
+	_offset = 0;
+}	
+
+//////////////////////////////////////////////////////////////////////
+// Seek to an offset
+//////////////////////////////////////////////////////////////////////
+
+void
+Packet::seek(unsigned new_offset) {
+	assert(new_offset < maxlen);
+	_offset = new_offset;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Reset to re-use full buffer
+//////////////////////////////////////////////////////////////////////
+
+void
+Packet::reset() {
+	_offset = 0;
+	buflen = maxlen;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output an unsigned byte (uint8_t)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator<<(uint8_t uch) {
+	return *this << (char)uch;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output a character
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator<<(char ch) {
+	assert(_offset < buflen);
+	buffer[_offset++] = (uint8_t)ch;
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output a null terminated C string
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator<<(const char *str) {
+
+	while ( *str )
+		*this << *str++;
+	*this << (char)0;
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output an unsigned int (16-bits)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator<<(uint16_t u) {
+	*this << (uint8_t)(u >> 8) << (uint8_t)(u & 0xFF);
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output an unsigned int (32-bits)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator<<(uint32_t u) {
+	*this << (uint8_t)((u >> 24) & 0xFF)
+		<< (uint8_t)((u >> 16) & 0xFF)
+		<< (uint8_t)((u >> 8) & 0xFF)
+		<< (uint8_t)(u & 0xFF);
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output an int (16-bits)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator<<(int16_t i) {
+	*this << (uint8_t)(i >> 8) << (uint8_t)(i & 0xFF);
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output an int (32-bits)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator<<(int32_t i) {
+	*this << (uint8_t)((i >> 24) & 0xFF)
+		<< (uint8_t)((i >> 16) & 0xFF)
+		<< (uint8_t)((i >> 8) & 0xFF)
+		<< (uint8_t)(i & 0xFF);
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Input a uint8_t
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator>>(uint8_t& uch) {
+	assert(_offset < buflen);
+
+	uch = buffer[_offset++];
+
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Input a character
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator>>(char& ch) {
+	assert(_offset < buflen);
+
+	ch = (char)buffer[_offset++];
+
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Input a null terminated C string (or until end of buffer)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator>>(char *str) {
+
+	for ( *str = 0; _offset < buflen; ++str ) {
+		*this >> *str;
+		if ( !*str )
+			return *this;
+	}
+
+	*str = 0;
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Input an unsigned int (16-bits)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator>>(uint16_t& u) {
+	char ch;
+
+	u = 0;
+	for ( short x=0; x<2; ++x ) {
+		*this >> ch;
+		u = (u << 8) | (uint16_t)ch;
+	}
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Input an unsigned int (32 bits)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator>>(uint32_t& u) {
+	char ch;
+
+	u = 0;
+	for ( short x=0; x<4; ++x ) {
+		*this >> ch;
+		u = (u << 8) | (uint32_t)ch;
+	}
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Input an int (16 bits)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator>>(int16_t& i) {
+	char ch;
+
+	i = 0;
+	for ( short x=0; x<2; ++x ) {
+		*this >> ch;
+		i = (i << 8) | (int16_t)(uint8_t)ch;
+	}
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Input an int (32 bits)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator>>(int32_t& i) {
+	char ch;
+
+	i = 0;
+	for ( short x=0; x<4; ++x ) {
+		*this >> ch;
+		i = (i << 8) | (int16_t)(uint8_t)ch;
+	}
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output a double (as a C string)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator<<(double f) {
+	char buf[64];
+
+	gcvt(f,USE_DBL_DIG,buf);
+	*this << buf;
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Input a double (from a C string)
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::operator>>(double& f) {
+	char buf[64];
+	
+	*this >> buf;
+	f = strtod(buf,0);
+	return *this;	
+}
+
+//////////////////////////////////////////////////////////////////////
+// Output a std::string
+//////////////////////////////////////////////////////////////////////
+
+#if USE_STDSTR
+Packet&
+Packet::operator<<(const std::string& str) {
+	uint16_t slen = str.size();
+	const char *data = (const char *)str.data();
+
+	*this << slen;
+	for ( ; slen > 0; --slen )
+		*this << *data++;
+	return *this;
+}
+#endif
+
+//////////////////////////////////////////////////////////////////////
+// Input an std::string
+//////////////////////////////////////////////////////////////////////
+
+#if USE_STDSTR
+Packet&
+Packet::operator>>(std::string& str) {
+	uint16_t slen;
+	char ch;
+
+	str.clear();
+	for ( *this >> slen; slen > 0; --slen ) {
+		*this >> ch;
+		str.append(1,ch);
+	}
+	return *this;
+}
+#endif // USE_STDSTR
+
+//////////////////////////////////////////////////////////////////////
+// Return a pointer to the C string in the buffer
+//////////////////////////////////////////////////////////////////////
+
+const char *
+Packet::c_str() {
+	const char *s = (const char *)buffer + _offset;
+
+	for ( unsigned ux = _offset; ux < buflen; ++ux ) {
+		if ( !buffer[ux] )
+			return s;		// This has a null terminating byte
+	}
+
+	return 0;				// This is unsafe-- no null terminator
+}
+
+//////////////////////////////////////////////////////////////////////
+// Copy pkt to this Packet's buffer. Return true if no truncation
+//////////////////////////////////////////////////////////////////////
+
+bool
+Packet::copy(const Packet& pkt) {
+	
+	if ( pkt.buflen >= this->maxlen )
+		return false;			// Too large to copy here
+
+	this->set_size(pkt.buflen);		// Set size from pkt
+	this->_offset = 0;			// Rewind this object for reading packet data
+
+	memcpy(this->buffer,pkt.buffer,pkt.buflen);
+	return true;
+}
+
+#if 0
+int
+main() {
+	char buf[64];
+
+	Packet p1(buf,sizeof buf);
+
+	std::string tstr = "Hello net!";
+
+	p1 << 23 << 98 << "abc" << (short)29 << tstr << ';' << 23.5 << static_cast<uint32_t>(6009u);
+
+	p1.set_size(p1.size());
+
+	p1.rewind();
+
+	int a, b;
+	short c;
+	char s1[32], c2;
+	double d;
+	uint32_t u;
+
+	std::string rstr;
+
+	p1 >> a >> b;
+
+	{
+		const char *s = p1.c_str();
+		assert(!strcmp(s,"abc"));
+	}
+
+	p1 >> s1 >> c >> rstr >> c2 >> d >> u;
+
+	assert(a == 23);
+	assert(b == 98);
+	assert(!strcmp(s1,"abc"));
+	assert(c == 29);
+	assert(tstr == "Hello net!");
+	assert(c2 == ';');
+	assert(d == 23.5);
+	assert(u == 6009u);
+
+	return 0;
+}
+#endif
+
+// End packet.cpp
