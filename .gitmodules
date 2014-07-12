@@ -1,0 +1,3 @@
+[submodule "common/slip"]
+	path = common/slip
+	url = git@github.com:ve3wwg/slip.git
