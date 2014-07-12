@@ -56,7 +56,7 @@ to the overall resources needed.
 
 Essentially, the BNEP approach amounts to this:
 
-   TCP/IP <-> BNEP <----//----> BNEP <-> TCP/IP
+    TCP/IP <-> BNEP <----//----> BNEP <-> TCP/IP
    
 The BNEP+TCP/IP stack is needed at both ends. Needing this in the AVR
 class device is a true disadvantage.
@@ -67,7 +67,7 @@ the POSIX gateway server end (where ample resources exist). The
 only needs the management of the sending and receiving of requests to be
 programmed for.
 
-  TCP/IP <-> BTSIG_Gateway <----//----> BTSIG_Nucleus
+    TCP/IP <-> BTSIG_Gateway <----//----> BTSIG_Nucleus
 
 Here we put the burden on the BTSIG Gateway, while keeping the BTSIG
 Nucleus as small and simple as we dare.
