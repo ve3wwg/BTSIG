@@ -22,6 +22,7 @@ enum command_e {
 	C_None = 0,			// Reserved
 	C_Enumerate,			// Enumerate interfaces
 	C_Socket,			// socket(2)
+	C_Connect,			// Connect to remote address
 	R_Enumerate_IPv4 = 0x81,	// IPv4 Interface enumerate response
 	R_Enumerate_IPv6,		// IPv6 Interface enumerate response
 	R_Enumerate_End,		// End of enumeration
@@ -41,40 +42,44 @@ enum sock_type_e {
 // Generic errno values
 //////////////////////////////////////////////////////////////////////
 
-#define	E_EPERM		 1	/* Operation not permitted */
-#define	E_ENOENT	 2	/* No such file or directory */
-#define	E_ESRCH		 3	/* No such process */
-#define	E_EINTR		 4	/* Interrupted system call */
-#define	E_EIO		 5	/* I/O error */
-#define	E_ENXIO		 6	/* No such device or address */
-#define	E_E2BIG		 7	/* Argument list too long */
-#define	E_ENOEXEC	 8	/* Exec format error */
-#define	E_EBADF		 9	/* Bad file number */
-#define	E_ECHILD	10	/* No child processes */
-#define	E_EAGAIN	11	/* Try again */
-#define	E_ENOMEM	12	/* Out of memory */
-#define	E_EACCES	13	/* Permission denied */
-#define	E_EFAULT	14	/* Bad address */
-#define	E_ENOTBLK	15	/* Block device required */
-#define	E_EBUSY		16	/* Device or resource busy */
-#define	E_EEXIST	17	/* File exists */
-#define	E_EXDEV		18	/* Cross-device link */
-#define	E_ENODEV	19	/* No such device */
-#define	E_ENOTDIR	20	/* Not a directory */
-#define	E_EISDIR	21	/* Is a directory */
-#define	E_EINVAL	22	/* Invalid argument */
-#define	E_ENFILE	23	/* File table overflow */
-#define	E_EMFILE	24	/* Too many open files */
-#define	E_ENOTTY	25	/* Not a typewriter */
-#define	E_ETXTBSY	26	/* Text file busy */
-#define	E_EFBIG		27	/* File too large */
-#define	E_ENOSPC	28	/* No space left on device */
-#define	E_ESPIPE	29	/* Illegal seek */
-#define	E_EROFS		30	/* Read-only file system */
-#define	E_EMLINK	31	/* Too many links */
-#define	E_EPIPE		32	/* Broken pipe */
-#define	E_EDOM		33	/* Math argument out of domain of func */
-#define	E_ERANGE	34	/* Math result not representable */
+#define E_OK		 0
+#define E_EPERM		 1	/* Operation not permitted */
+#define E_ENOENT	 2	/* No such file or directory */
+#define E_ESRCH		 3	/* No such process */
+#define E_EINTR		 4	/* Interrupted system call */
+#define E_EIO		 5	/* I/O error */
+#define E_ENXIO		 6	/* No such device or address */
+#define E_E2BIG		 7	/* Argument list too long */
+#define E_ENOEXEC	 8	/* Exec format error */
+#define E_EBADF		 9	/* Bad file number */
+#define E_ECHILD	10	/* No child processes */
+#define E_EAGAIN	11	/* Try again */
+#define E_ENOMEM	12	/* Out of memory */
+#define E_EACCES	13	/* Permission denied */
+#define E_EFAULT	14	/* Bad address */
+#define E_ENOTBLK	15	/* Block device required */
+#define E_EBUSY		16	/* Device or resource busy */
+#define E_EEXIST	17	/* File exists */
+#define E_EXDEV		18	/* Cross-device link */
+#define E_ENODEV	19	/* No such device */
+#define E_ENOTDIR	20	/* Not a directory */
+#define E_EISDIR	21	/* Is a directory */
+#define E_EINVAL	22	/* Invalid argument */
+#define E_ENFILE	23	/* File table overflow */
+#define E_EMFILE	24	/* Too many open files */
+#define E_ENOTTY	25	/* Not a typewriter */
+#define E_ETXTBSY	26	/* Text file busy */
+#define E_EFBIG		27	/* File too large */
+#define E_ENOSPC	28	/* No space left on device */
+#define E_ESPIPE	29	/* Illegal seek */
+#define E_EROFS		30	/* Read-only file system */
+#define E_EMLINK	31	/* Too many links */
+#define E_EPIPE		32	/* Broken pipe */
+#define E_EDOM		33	/* Math argument out of domain of func */
+#define E_ERANGE	34	/* Math result not representable */
+
+#define E_ECONNREFUSED	50
+#define E_EHOSTUNREACH	51
 
 #endif // ENUMS_HPP
 
