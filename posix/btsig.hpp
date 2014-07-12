@@ -55,6 +55,7 @@ class BTSIG : public SlipSer {
 	unsigned _request(Packet& pkt,time_t timeout);
 
 	int _socket(com_domain_e domain,sock_type_e type,int protocol);
+	int _connect(int sock,unsigned port,const char *address);
 
 public:	BTSIG();
 
@@ -68,6 +69,7 @@ public:	BTSIG();
 	static void terminate();
 
 	static int socket(com_domain_e domain,sock_type_e type,int protocol);
+	static int connect(int sock,unsigned port,const char *address);
 };
 
 

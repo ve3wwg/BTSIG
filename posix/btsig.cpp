@@ -34,7 +34,7 @@ BTSIG::BTSIG() {
 	rx_fiber = fibers.create(BTSIG::recv,0,8192);
 	tx_fiber = fibers.create(BTSIG::xmit,0,8192);
 
-	btsig.connect();
+	btsig.SlipSer::connect();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -358,8 +358,31 @@ BTSIG::_socket(com_domain_e domain,sock_type_e type,int protocol) {
 }
 
 int
+BTSIG::_connect(int sock,unsigned port,const char *address) {
+	char buf[128];
+	Packet pkt(buf,sizeof buf);	
+
+	pkt	<< uint8_t(C_Connect) << _seqno() << int16_t(sock) << int16_t(port) << address;
+
+	if ( !_request(pkt,8) )
+		return -E_EPIPE;		// Request failed
+	
+	uint16_t urc;
+
+	pkt.seek(5);
+	pkt >> urc;
+
+	return -int(urc);			// Returns zero when successful
+}
+
+int
 BTSIG::socket(com_domain_e domain,sock_type_e type,int protocol) {
 	return btsig._socket(domain,type,protocol);
+}
+
+int
+BTSIG::connect(int sock,unsigned port,const char *address) {
+	return btsig._connect(sock,port,address);
 }
 
 // End btsig.cpp
