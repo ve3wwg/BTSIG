@@ -7,19 +7,27 @@ include Makefile.conf
 CXX_FILES 	:= $(wildcard *.cpp)
 OBJS 		:= $(CXX_FILES:.cpp=.o) 
 
-all:	xclient xserver
+all:	slip.o xclient xserver
 
-xclient: xclient.o mutex.o slipser.o btsig.o slip/slip.o packet.o
-	$(CXX) xclient.o mutex.o slipser.o btsig.o slip/slip.o packet.o -o xclient $(LDFLAGS)
+xclient: xclient.o mutex.o slipser.o btsig.o slip.o packet.o
+	$(CXX) xclient.o mutex.o slipser.o btsig.o slip.o packet.o -o xclient $(LDFLAGS)
 
-xserver: xserver.o mutex.o slipser.o iface.o protocol.o slip/slip.o packet.o 
-	$(CXX) xserver.o mutex.o slipser.o iface.o protocol.o slip/slip.o packet.o -o xserver $(LDFLAGS)
+xserver: xserver.o mutex.o slipser.o iface.o protocol.o slip.o packet.o 
+	$(CXX) xserver.o mutex.o slipser.o iface.o protocol.o slip.o packet.o -o xserver $(LDFLAGS)
 
 pkt:	packet.o
 	$(CXX) packet.o -o pkt
 
-slip/slip.o:
-	$(MAKE) -$(MAKEFLAGS) -C slip -f Makefile.posix
+slip.cpp: ../common/slip/slip.cpp
+	ln -s ../common/slip/slip.cpp slip.cpp
+
+slip.hpp: ../common/slip/slip.hpp
+	ln -s ../common/slip/slip.hpp slip.hpp
+
+crc8.cpp: ../common/slip/crc8.cpp
+	ln -s ../common/slip/crc8.cpp crc8.cpp
+
+slip.o:	slip.cpp slip.hpp crc8.cpp
 
 btsigserv: slipser.hpp
 xclient: slipser.hpp
@@ -34,9 +42,8 @@ clean:
 	rm -f *.o
 
 distclean: clean
-	rm -f errs.t
+	rm -f errs.t slip.cpp slip.hpp crc8.cpp
 	rm -f sock xserver xclient pkt *.core core.*
-	$(MAKE) -C slip -f Makefile.posix distclean
 
 clobber: distclean
 

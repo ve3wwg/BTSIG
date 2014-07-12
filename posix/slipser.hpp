@@ -6,7 +6,7 @@
 #ifndef SLIPSER_HPP
 #define SLIPSER_HPP
 
-#include "slip/slip.hpp"
+#include "slip.hpp"
 
 
 class SlipSer : public SLIP {
