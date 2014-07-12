@@ -10,6 +10,10 @@
 #include <string.h>
 #include <assert.h>
 
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
 #include "protocol.hpp"
 #include "packet.hpp"
 #include "enums.hpp"
@@ -17,6 +21,33 @@
 static Protocol protocol;
 
 Protocol::Protocol() {
+}
+
+bool
+Protocol::make_ipv4_addr(sockaddr_in& sockaddr,unsigned port,const char *addr) {
+
+	if ( !(port & 0xFFFF) )
+		return false;
+
+	memset(&sockaddr,0,sizeof sockaddr);
+	if ( !inet_pton(AF_INET,addr,&sockaddr.sin_addr) ) {
+		struct hostent *h = gethostbyname(addr);
+
+		if ( !h )
+			return false;		// Failed lookup
+
+		if ( h->h_addrtype != AF_INET )
+			return false;
+
+		sockaddr.sin_family = AF_INET;
+		sockaddr.sin_addr   = *(in_addr *)h->h_addr;
+		sockaddr.sin_port   = htons(port);
+		return true;
+	}
+
+	sockaddr.sin_family = AF_INET;
+	sockaddr.sin_port = htons(port);
+	return true;
 }
 
 void
@@ -93,6 +124,48 @@ printf(" got socket fd = %d;\n",fd);
 }
 
 void
+Protocol::connect(Packet& pkt) {
+	uint8_t cmd;
+	uint32_t seqno;
+	uint16_t sock, port;
+	const char *addr = 0;
+	int16_t er = E_OK;
+
+	pkt.rewind();
+	pkt >> cmd >> seqno >> sock >> port;
+	addr = pkt.c_str();
+
+	printf("Got connect(sock=%d,%u,'%s')\n",sock,port,addr);
+
+	sockaddr_in skaddr;
+
+	if ( !make_ipv4_addr(skaddr,port,addr) ) {
+		er = E_EINVAL;
+	} else	{
+		int rc = ::connect(sock,(sockaddr *)&skaddr,sizeof skaddr);
+		
+		if ( rc == -1 ) {
+			switch ( errno ) {
+			case ECONNREFUSED :
+				er = E_ECONNREFUSED;
+				break;
+			case EHOSTUNREACH :
+				er = E_EHOSTUNREACH;
+				break;
+			default :
+				er = E_EIO;
+			}
+		}
+	}
+
+	pkt.reset();
+	pkt << cmd << seqno << er;
+
+	pkt.set_size(pkt.offset());
+	send(pkt);
+}
+
+void
 Protocol::receiver() {
 
 	listen();
@@ -117,6 +190,9 @@ Protocol::receiver() {
 			break;
 		case C_Socket :
 			socket(pkt);
+			break;
+		case C_Connect :
+			connect(pkt);
 			break;
 		default :
 			pkt >> seqno;

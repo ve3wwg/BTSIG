@@ -14,11 +14,15 @@
 class Protocol : public SlipSer {
 	Ifaces		iface;	// Interface information
 
+	bool make_ipv4_addr(sockaddr_in& sockaddr,unsigned port,const char *addr);
+
+	void enumerate();
+	void socket(Packet& pkt);
+	void connect(Packet& pkt);
+
 public:	Protocol();
 
 	void receiver();
-	void enumerate();
-	void socket(Packet& pkt);
 
 	void send(const Packet& pkt);
 
