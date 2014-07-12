@@ -106,4 +106,10 @@ between the xserver and xclient processes. The xserver program acts as a
 test bed for the POSIX BTSIG gateway server components. The xclient
 program tests the BTSIG nucleus that runs on the Teensy side.
 
---
+GIT CLONE:
+----------
+
+Because this project uses submodules, use the following to download all
+of the required code:
+
+$ git clone --recursive git@github.com:ve3wwg/BTSIG.git
