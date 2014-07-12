@@ -35,8 +35,17 @@ main(int argc,char **argv) {
 			protocol);
 	}
 
-	int rc = BTSIG::socket(CD_AF_INET,ST_SOCK_STREAM,0);
-	printf("Got rc = %d back from socket()\n",rc);
+	int sock = BTSIG::socket(CD_AF_INET,ST_SOCK_STREAM,0);
+	printf("Got sock = %d back from socket()\n",sock);
+
+	if ( sock >= 0 ) {
+		int rc;
+
+//		rc = BTSIG::connect(sock,80,"24.226.16.44");
+		rc = BTSIG::connect(sock,80,"google.com");
+
+		printf("Got rc = %d from connect() request\n",rc);
+	}
 
 	BTSIG::terminate();
 
