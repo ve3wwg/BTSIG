@@ -329,6 +329,32 @@ Packet::copy(const Packet& pkt) {
 	return true;
 }
 
+//////////////////////////////////////////////////////////////////////
+// Put n bytes into the packet
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::put(const void *data,unsigned bytes) {
+
+	assert(_offset + bytes <= maxlen);
+	memcpy(buffer+_offset,data,bytes);
+	_offset += bytes;
+	return *this;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Get n bytes from the packet
+//////////////////////////////////////////////////////////////////////
+
+Packet&
+Packet::get(void *data,unsigned bytes) {
+
+	assert(buflen - _offset >= bytes);
+	memcpy(data,buffer+_offset,bytes);
+	_offset += bytes;
+	return *this;
+}
+
 #if 0
 int
 main() {

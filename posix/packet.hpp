@@ -48,6 +48,8 @@ public:	Packet(void *buffer,size_t buflen);
 	Packet& operator<<(int32_t i);
 	Packet& operator<<(double f);
 
+	Packet& put(const void *data,unsigned bytes);
+
 	Packet& operator>>(uint8_t &uch);
 	Packet& operator>>(char &ch);
 	Packet& operator>>(char *str);
@@ -56,6 +58,8 @@ public:	Packet(void *buffer,size_t buflen);
 	Packet& operator>>(int16_t& i);
 	Packet& operator>>(int32_t& i);
 	Packet& operator>>(double& f);
+
+	Packet& get(void *data,unsigned bytes);
 
 #ifdef USE_STDSTR
 	Packet& operator<<(const std::string& str);
