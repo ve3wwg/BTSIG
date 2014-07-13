@@ -12,6 +12,8 @@
 typedef unsigned long time_t;
 #endif
 
+#define MAX_IO_BYTES		8196
+
 enum protocols_e {
 	P_None = 0,		// Also could mean "any"
 	P_IPv4 = 1,		// IPv4
@@ -23,6 +25,9 @@ enum command_e {
 	C_Enumerate,			// Enumerate interfaces
 	C_Socket,			// socket(2)
 	C_Connect,			// Connect to remote address
+	C_Write,			// Write socket
+	C_Read,				// Read socket
+	C_Close,			// Close a socket
 	R_Enumerate_IPv4 = 0x81,	// IPv4 Interface enumerate response
 	R_Enumerate_IPv6,		// IPv6 Interface enumerate response
 	R_Enumerate_End,		// End of enumeration
