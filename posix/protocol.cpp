@@ -118,7 +118,7 @@ printf(" got socket fd = %d;\n",fd);
 
 	pkt.reset();
 	pkt << cmd << seqno << fd;
-	pkt.set_size(pkt.offset());
+	pkt.close();
 	assert(pkt.size() == 9);
 	send(pkt);
 }
@@ -131,8 +131,7 @@ Protocol::connect(Packet& pkt) {
 	const char *addr = 0;
 	int16_t er = E_OK;
 
-	pkt.rewind();
-	pkt >> cmd >> seqno >> sock >> port;
+	pkt.rewind() >> cmd >> seqno >> sock >> port;
 	addr = pkt.c_str();
 
 	printf("Got connect(sock=%d,%u,'%s')\n",sock,port,addr);
@@ -158,10 +157,8 @@ Protocol::connect(Packet& pkt) {
 		}
 	}
 
-	pkt.reset();
-	pkt << cmd << seqno << er;
-
-	pkt.set_size(pkt.offset());
+	pkt.reset() << cmd << seqno << er;
+	pkt.close();
 	send(pkt);
 }
 
@@ -173,8 +170,7 @@ Protocol::close(Packet& pkt) {
 	int16_t er = E_OK;
 	int rc;
 
-	pkt.rewind();
-	pkt >> cmd >> seqno >> sock;
+	pkt.rewind() >> cmd >> seqno >> sock;
 
 	do	{
 		rc = ::close(sock);
@@ -193,10 +189,8 @@ Protocol::close(Packet& pkt) {
 
 printf("Got close(sock=%d) returns %d\n",sock,er);
 
-	pkt.reset();
-	pkt << cmd << seqno << er;
-
-	pkt.set_size(pkt.offset());
+	pkt.reset() << cmd << seqno << er;
+	pkt.close();
 	send(pkt);
 }
 
@@ -209,18 +203,13 @@ Protocol::read(Packet& pkt) {
 	int16_t er = E_OK;
 	int rc;
 
-	pkt.rewind();
-	pkt >> cmd >> seqno >> sock >> bytes;
-
-printf("Got read(sock=%d,,%u)..\n",sock,unsigned(bytes));
-
-if ( bytes > MAX_IO_BYTES ) bytes = 1000;
+	pkt.rewind() >> cmd >> seqno >> sock >> bytes;
 
 	if ( bytes <= MAX_IO_BYTES ) {
 		do	{
 			rc = ::read(sock,iobuf,bytes);
 		} while ( rc == -1 && errno == EINTR );
-printf("  ::read() => rc = %d (%s)\n",rc,strerror(errno));		
+
 		if ( rc == -1 ) {
 			switch ( errno ) {
 			case EBADF :
@@ -239,15 +228,11 @@ printf("  ::read() => rc = %d (%s)\n",rc,strerror(errno));
 		bytes = 0;
 	}
 
-printf("Got read(sock=%d) returns %d (bytes = %u)\n",sock,er,bytes);
-
-	pkt.reset();
-	pkt << cmd << seqno << er << bytes;
-printf("  offset = %u, size = %u, maxsize = %u \n",pkt.offset(),pkt.size(),pkt.maxsize());
+	pkt.reset() << cmd << seqno << er << bytes;
 	if ( bytes > 0 )
 		pkt.put(iobuf,bytes);
 
-	pkt.set_size(pkt.offset());
+	pkt.close();
 	send(pkt);
 }
 
@@ -260,9 +245,7 @@ Protocol::write(Packet& pkt) {
 	const void *data = 0;
 	int rc;
 
-	pkt.rewind();
-	pkt >> cmd >> seqno >> sock >> bytes;
-printf("write(sock=%d,,butes=%u) request..\n",sock,bytes);
+	pkt.rewind() >> cmd >> seqno >> sock >> bytes;
 	data = pkt.point();
 
 	if ( bytes <= MAX_IO_BYTES ) {
@@ -290,9 +273,8 @@ printf("write(sock=%d,,butes=%u) request..\n",sock,bytes);
 
 printf("Got write(sock=%d) returns %d (bytes = %u)\n",sock,er,bytes);
 
-	pkt.reset();
-	pkt << cmd << seqno << er << bytes;
-	pkt.set_size(pkt.offset());
+	pkt.reset() << cmd << seqno << er << bytes;
+	pkt.close();
 	send(pkt);
 }
 
