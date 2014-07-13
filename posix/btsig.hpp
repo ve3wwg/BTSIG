@@ -19,6 +19,8 @@ class BTSIG : public SlipSer {
 	volatile bool		f_enum;		// True after interfaces have been enumerated
 	volatile uint32_t	seqno;		// Outgoing sequence numbers
 
+	uint8_t			pktbuf[MAX_IO_BYTES];
+
 	struct s_iface {
 		protocols_e	protocol;	// Interface protocol
 		const char	*addr;		// Interface address string
