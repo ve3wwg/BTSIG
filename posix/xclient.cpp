@@ -41,7 +41,6 @@ main(int argc,char **argv) {
 	if ( sock >= 0 ) {
 		int rc;
 
-//		rc = BTSIG::connect(sock,80,"24.226.16.44");
 		rc = BTSIG::connect(sock,80,"google.com");
 		printf("Got rc = %d from connect() request\n",rc);
 
@@ -51,6 +50,9 @@ main(int argc,char **argv) {
 		char buf[1000];
 		rc = BTSIG::read(sock,buf,sizeof buf);
 		printf("Got rc = %d from read()\n",rc);
+
+		if ( rc > 0 )
+			printf("  buf[]='%80.80s...';\n",buf);
 
 		rc = BTSIG::close(sock);
 		printf("BTSIG::close(%d) returned %d;\n",sock,rc);
