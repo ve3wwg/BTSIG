@@ -38,12 +38,15 @@ xfibers: $(OBJS)
 
 xfibers: fibers.hpp
 
+xpacket: packet.o xpacket.o
+	$(CXX) xpacket.o packet.o -o xpacket $(LDFLAGS)
+
 clean:
 	rm -f *.o
 
 distclean: clean
 	rm -f errs.t slip.cpp slip.hpp crc8.cpp
-	rm -f sock xserver xclient pkt *.core core.*
+	rm -f sock xserver xclient xpacket pkt *.core core.*
 
 clobber: distclean
 
