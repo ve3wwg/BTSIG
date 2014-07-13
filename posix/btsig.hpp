@@ -56,6 +56,9 @@ class BTSIG : public SlipSer {
 
 	int _socket(com_domain_e domain,sock_type_e type,int protocol);
 	int _connect(int sock,unsigned port,const char *address);
+	int _write(int sock,const void *buffer,unsigned bytes);
+	int _read(int sock,void *buffer,unsigned bytes);
+	int _close(int sock);
 
 public:	BTSIG();
 
@@ -70,6 +73,9 @@ public:	BTSIG();
 
 	static int socket(com_domain_e domain,sock_type_e type,int protocol);
 	static int connect(int sock,unsigned port,const char *address);
+	static int write(int sock,const void *buffer,unsigned bytes);
+	static int read(int sock,void *buffer,unsigned bytes);
+	static int close(int sock);
 };
 
 

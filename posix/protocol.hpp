@@ -19,6 +19,9 @@ class Protocol : public SlipSer {
 	void enumerate();
 	void socket(Packet& pkt);
 	void connect(Packet& pkt);
+	void read(Packet& pkt);
+	void write(Packet& pkt);
+	void close(Packet& pkt);
 
 public:	Protocol();
 

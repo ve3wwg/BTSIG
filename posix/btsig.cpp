@@ -58,7 +58,7 @@ BTSIG::receiver() {
 	command_e rsp;
 
 	while ( !f_enum ) {
-		rlen = read(buf,sizeof buf);
+		rlen = SlipSer::read(buf,sizeof buf);
 		Packet pkt(buf,rlen);
 		uint8_t b;
 
@@ -115,7 +115,7 @@ BTSIG::receiver() {
 	}
 
 	for (;;) {
-		rlen = read(buf,sizeof buf);
+		rlen = SlipSer::read(buf,sizeof buf);
 		Packet pkt(buf,rlen);
 		uint8_t b;
 		uint32_t seqno;
@@ -157,7 +157,7 @@ BTSIG::transmitter() {
 
 	while ( !btsig.f_enum ) {
 		if ( !req_sent || (time() - req_sent) > 3 ) {
-			write(cmd_enumerate,sizeof cmd_enumerate);
+			SlipSer::write(cmd_enumerate,sizeof cmd_enumerate);
 			req_sent = time();
 		}
 	}
@@ -169,7 +169,7 @@ BTSIG::transmitter() {
 			volatile s_request *req = txroot;	// First request
 			txroot = req->next;			// Remove from tx queue
 			*rxtail = req;				// Add to receiver queue (in case we get fast reply)
-			write(req->pkt->data(),req->pkt->size()); // Write packet out
+			SlipSer::write(req->pkt->data(),req->pkt->size()); // Write packet out
 printf("Request transmitted.\n");
 		} else if ( rxroot != 0 ) {
 			time_t now = time();				// Get current time
@@ -184,7 +184,7 @@ printf("Request transmitted.\n");
 					req->pkt->seek(1u);
 					*req->pkt << uint32_t(req->seqno);		// Rewrite the sequence #
 printf("Retransmitting request %02X as new seqno %u\n",req->cmd,req->seqno);
-					write(req->pkt->data(),req->pkt->size());	// Resend request with new seqno
+					SlipSer::write(req->pkt->data(),req->pkt->size());	// Resend request with new seqno
 				}
 			}
 			yield();
@@ -347,7 +347,7 @@ BTSIG::_socket(com_domain_e domain,sock_type_e type,int protocol) {
 		<< uint8_t(domain) << uint8_t(type) << int32_t(protocol);
 
 	if ( !_request(pkt,8) )
-		return -E_EPIPE;		// Request failed
+		return -E_EIO;			// Request failed
 	
 	int sock = -1;
 
@@ -362,10 +362,10 @@ BTSIG::_connect(int sock,unsigned port,const char *address) {
 	char buf[128];
 	Packet pkt(buf,sizeof buf);	
 
-	pkt	<< uint8_t(C_Connect) << _seqno() << int16_t(sock) << int16_t(port) << address;
+	pkt << uint8_t(C_Connect) << _seqno() << int16_t(sock) << int16_t(port) << address;
 
 	if ( !_request(pkt,8) )
-		return -E_EPIPE;		// Request failed
+		return -E_EIO;			// Request failed
 	
 	uint16_t urc;
 
@@ -376,6 +376,79 @@ BTSIG::_connect(int sock,unsigned port,const char *address) {
 }
 
 int
+BTSIG::_close(int sock) {
+	char buf[32];
+	Packet pkt(buf,sizeof buf);
+
+	pkt << uint8_t(C_Close) << _seqno() << int16_t(sock);
+	if ( !_request(pkt,8) )
+		return -E_EIO;
+
+	uint16_t urc;
+	pkt.seek(5);
+	pkt >> urc;
+
+	return -int(urc);
+}
+
+int
+BTSIG::_write(int sock,const void *buffer,unsigned bytes) {
+
+	if ( bytes > MAX_IO_BYTES )
+		return -E_EINVAL;
+
+	char buf[bytes+32];
+	Packet pkt(buf,bytes+32);
+
+	pkt << uint8_t(C_Write) << _seqno() << int16_t(sock) << int16_t(bytes);
+	pkt.put(buffer,bytes);
+
+	if ( !_request(pkt,10) )
+		return -E_EIO;
+
+	uint16_t urc, wrbytes;
+	pkt.seek(5);
+	pkt >> urc >> wrbytes;
+
+	return !urc ? wrbytes : -int(urc);
+}
+
+int
+BTSIG::_read(int sock,void *buffer,unsigned bytes) {
+
+	if ( bytes > MAX_IO_BYTES )
+		return -E_EINVAL;
+
+	char buf[bytes+32];
+	Packet pkt(buf,bytes+32);
+
+printf("Requesting read of %u bytes\n",bytes);
+	pkt << uint8_t(C_Read) << _seqno() << int16_t(sock) << uint16_t(bytes);
+
+	if ( !_request(pkt,10) )
+		return -E_EIO;
+
+	uint16_t urc, rdlen;
+	pkt.seek(5);
+	pkt >> urc;
+
+printf("Read rc = %u..\n",urc);
+
+	if ( urc != 0 )
+		return -int(urc);	// Error returned
+
+	pkt >> rdlen;
+	assert(rdlen <= bytes);
+
+printf("Read %u bytes!\n",rdlen);
+
+	if ( rdlen > 0 )
+		pkt.get(buffer,rdlen);
+
+	return int(rdlen);		// # of bytes returned
+}
+
+int
 BTSIG::socket(com_domain_e domain,sock_type_e type,int protocol) {
 	return btsig._socket(domain,type,protocol);
 }
@@ -383,6 +456,21 @@ BTSIG::socket(com_domain_e domain,sock_type_e type,int protocol) {
 int
 BTSIG::connect(int sock,unsigned port,const char *address) {
 	return btsig._connect(sock,port,address);
+}
+
+int
+BTSIG::close(int sock) {
+	return btsig._close(sock);
+}
+
+int
+BTSIG::write(int sock,const void *buffer,unsigned bytes) {
+	return btsig._write(sock,buffer,bytes);
+}
+
+int
+BTSIG::read(int sock,void *buffer,unsigned bytes) {
+	return btsig._read(sock,buffer,bytes);
 }
 
 // End btsig.cpp

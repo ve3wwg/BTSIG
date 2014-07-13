@@ -43,8 +43,17 @@ main(int argc,char **argv) {
 
 //		rc = BTSIG::connect(sock,80,"24.226.16.44");
 		rc = BTSIG::connect(sock,80,"google.com");
-
 		printf("Got rc = %d from connect() request\n",rc);
+
+		rc = BTSIG::write(sock,"GET /\r\n",7);
+		printf("Got rc = %d from write()\n",rc);
+
+		char buf[1000];
+		rc = BTSIG::read(sock,buf,sizeof buf);
+		printf("Got rc = %d from read()\n",rc);
+
+		rc = BTSIG::close(sock);
+		printf("BTSIG::close(%d) returned %d;\n",sock,rc);
 	}
 
 	BTSIG::terminate();

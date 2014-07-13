@@ -70,7 +70,7 @@ Protocol::enumerate() {
 		}
 	}
 
-	write(&rsp[np],1);
+	SlipSer::write(&rsp[np],1);
 }
 
 void
@@ -166,19 +166,152 @@ Protocol::connect(Packet& pkt) {
 }
 
 void
+Protocol::close(Packet& pkt) {
+	uint8_t cmd;
+	uint32_t seqno;
+	uint16_t sock;
+	int16_t er = E_OK;
+	int rc;
+
+	pkt.rewind();
+	pkt >> cmd >> seqno >> sock;
+
+	do	{
+		rc = ::close(sock);
+	} while ( rc == -1 && errno == EINTR );
+		
+	if ( rc == -1 ) {
+		switch ( errno ) {
+		case EBADF :
+			er = E_EBADF;
+			break;
+		case EIO :
+		default :
+			er = E_EIO;
+		}
+	}
+
+printf("Got close(sock=%d) returns %d\n",sock,er);
+
+	pkt.reset();
+	pkt << cmd << seqno << er;
+
+	pkt.set_size(pkt.offset());
+	send(pkt);
+}
+
+void
+Protocol::read(Packet& pkt) {
+	uint8_t cmd;
+	uint32_t seqno;
+	uint16_t sock, bytes;
+	char iobuf[MAX_IO_BYTES];
+	int16_t er = E_OK;
+	int rc;
+
+	pkt.rewind();
+	pkt >> cmd >> seqno >> sock >> bytes;
+
+printf("Got read(sock=%d,,%u)..\n",sock,unsigned(bytes));
+
+if ( bytes > MAX_IO_BYTES ) bytes = 1000;
+
+	if ( bytes <= MAX_IO_BYTES ) {
+		do	{
+			rc = ::read(sock,iobuf,bytes);
+		} while ( rc == -1 && errno == EINTR );
+printf("  ::read() => rc = %d (%s)\n",rc,strerror(errno));		
+		if ( rc == -1 ) {
+			switch ( errno ) {
+			case EBADF :
+				er = E_EBADF;
+				break;
+			case EIO :
+			default :
+				er = E_EIO;
+			}
+			bytes = 0;
+		} else	{
+			bytes = rc;
+		}
+	} else	{
+		er = E_EINVAL;
+		bytes = 0;
+	}
+
+printf("Got read(sock=%d) returns %d (bytes = %u)\n",sock,er,bytes);
+
+	pkt.reset();
+	pkt << cmd << seqno << er << bytes;
+printf("  offset = %u, size = %u, maxsize = %u \n",pkt.offset(),pkt.size(),pkt.maxsize());
+	if ( bytes > 0 )
+		pkt.put(iobuf,bytes);
+
+	pkt.set_size(pkt.offset());
+	send(pkt);
+}
+
+void
+Protocol::write(Packet& pkt) {
+	uint8_t cmd;
+	uint32_t seqno;
+	uint16_t sock, bytes;
+	int16_t er = E_OK;
+	const void *data = 0;
+	int rc;
+
+	pkt.rewind();
+	pkt >> cmd >> seqno >> sock >> bytes;
+printf("write(sock=%d,,butes=%u) request..\n",sock,bytes);
+	data = pkt.point();
+
+	if ( bytes <= MAX_IO_BYTES ) {
+		do	{
+			rc = ::write(sock,data,bytes);
+		} while ( rc == -1 && errno == EINTR );
+		
+		if ( rc == -1 ) {
+			switch ( errno ) {
+			case EBADF :
+				er = E_EBADF;
+				break;
+			case EIO :
+			default :
+				er = E_EIO;
+			}
+			bytes = 0;
+		} else	{
+			bytes = rc;
+		}
+	} else	{
+		er = E_EINVAL;
+		bytes = 0;
+	}
+
+printf("Got write(sock=%d) returns %d (bytes = %u)\n",sock,er,bytes);
+
+	pkt.reset();
+	pkt << cmd << seqno << er << bytes;
+	pkt.set_size(pkt.offset());
+	send(pkt);
+}
+
+void
 Protocol::receiver() {
 
 	listen();
 
-	uint8_t buf[64];
+	uint8_t buf[MAX_IO_BYTES+32];
 	unsigned retlen = 0;
 
 	for (;;) {
-		retlen = protocol.read(buf,sizeof buf);
+		retlen = protocol.SlipSer::read(buf,sizeof buf);
 		if ( retlen < 1 )
 			continue;
 
-		Packet pkt(buf,retlen);
+		Packet pkt(buf,sizeof buf);
+		pkt.set_size(retlen);
+
 		uint8_t cmd;
 		uint32_t seqno;
 
@@ -193,6 +326,15 @@ Protocol::receiver() {
 			break;
 		case C_Connect :
 			connect(pkt);
+			break;
+		case C_Read :
+			read(pkt);
+			break;
+		case C_Write :
+			write(pkt);
+			break;
+		case C_Close :
+			close(pkt);
 			break;
 		default :
 			pkt >> seqno;
@@ -214,7 +356,7 @@ Protocol::xmit() {
 
 void
 Protocol::send(const Packet& pkt) {
-	write(pkt.data(),pkt.size());
+	SlipSer::write(pkt.data(),pkt.size());
 }
 
 // End protocol.cpp
