@@ -26,16 +26,18 @@ class Packet {
 
 public:	Packet(void *buffer,size_t buflen);
 
-	void rewind();				// Rewind offset, without changing buflen
-	void reset();				// Rewind offset, set buflen = maxlen
+	Packet& rewind();			// Rewind offset, without changing buflen
+	Packet& reset();			// Rewind offset, set buflen = maxlen
 
 	inline const void *data() const		{ return buffer; }
 	inline unsigned offset() const 		{ return _offset; }
 	inline unsigned size() const		{ return buflen; }
+	inline unsigned maxsize() const		{ return maxlen; }
+	inline const void *point() const	{ return buffer + _offset; }
 
 	inline void set_size(unsigned sz) 	{ buflen = sz; }
 
-	void seek(unsigned new_offset);
+	Packet& seek(unsigned new_offset);
 
 	bool copy(const Packet& pkt);		// Copy from pkt to this object (return true if not truncated)
 
