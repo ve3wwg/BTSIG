@@ -12,7 +12,7 @@
 typedef unsigned long time_t;
 #endif
 
-#define MAX_IO_BYTES		8196
+#define MAX_IO_BYTES		4096
 
 enum protocols_e {
 	P_None = 0,		// Also could mean "any"
