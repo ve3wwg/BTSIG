@@ -179,7 +179,7 @@ Packet::operator>>(char *str) {
 
 Packet&
 Packet::operator>>(uint16_t& u) {
-	char ch;
+	uint8_t ch;
 
 	u = 0;
 	for ( short x=0; x<2; ++x ) {
@@ -195,7 +195,7 @@ Packet::operator>>(uint16_t& u) {
 
 Packet&
 Packet::operator>>(uint32_t& u) {
-	char ch;
+	uint8_t ch;
 
 	u = 0;
 	for ( short x=0; x<4; ++x ) {
@@ -211,7 +211,7 @@ Packet::operator>>(uint32_t& u) {
 
 Packet&
 Packet::operator>>(int16_t& i) {
-	char ch;
+	uint8_t ch;
 
 	i = 0;
 	for ( short x=0; x<2; ++x ) {
@@ -227,7 +227,7 @@ Packet::operator>>(int16_t& i) {
 
 Packet&
 Packet::operator>>(int32_t& i) {
-	char ch;
+	uint8_t ch;
 
 	i = 0;
 	for ( short x=0; x<4; ++x ) {
@@ -357,50 +357,5 @@ Packet::get(void *data,unsigned bytes) {
 	_offset += bytes;
 	return *this;
 }
-
-#if 0
-int
-main() {
-	char buf[64];
-
-	Packet p1(buf,sizeof buf);
-
-	std::string tstr = "Hello net!";
-
-	p1 << 23 << 98 << "abc" << (short)29 << tstr << ';' << 23.5 << static_cast<uint32_t>(6009u);
-
-	p1.set_size(p1.size());
-
-	p1.rewind();
-
-	int a, b;
-	short c;
-	char s1[32], c2;
-	double d;
-	uint32_t u;
-
-	std::string rstr;
-
-	p1 >> a >> b;
-
-	{
-		const char *s = p1.c_str();
-		assert(!strcmp(s,"abc"));
-	}
-
-	p1 >> s1 >> c >> rstr >> c2 >> d >> u;
-
-	assert(a == 23);
-	assert(b == 98);
-	assert(!strcmp(s1,"abc"));
-	assert(c == 29);
-	assert(tstr == "Hello net!");
-	assert(c2 == ';');
-	assert(d == 23.5);
-	assert(u == 6009u);
-
-	return 0;
-}
-#endif
 
 // End packet.cpp
