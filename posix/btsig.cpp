@@ -53,13 +53,12 @@ BTSIG::terminate() {
 
 void
 BTSIG::receiver() {
-	uint8_t buf[64];
 	unsigned rlen;
 	command_e rsp;
 
 	while ( !f_enum ) {
-		rlen = SlipSer::read(buf,sizeof buf);
-		Packet pkt(buf,rlen);
+		rlen = SlipSer::read(pktbuf,sizeof pktbuf);
+		Packet pkt(pktbuf,rlen);
 		uint8_t b;
 
 		pkt >> b;
@@ -115,14 +114,14 @@ BTSIG::receiver() {
 	}
 
 	for (;;) {
-		rlen = SlipSer::read(buf,sizeof buf);
-		Packet pkt(buf,rlen);
+		rlen = SlipSer::read(pktbuf,sizeof pktbuf);
+		Packet pkt(pktbuf,rlen);
 		uint8_t b;
 		uint32_t seqno;
 
 		pkt >> b >> seqno;
 
-printf("Receiver response %02X seqno %u\n",b,seqno);
+printf("Receiver response %02X seqno %u (%u bytes)\n",b,seqno,pkt.size());
 
 		volatile s_request * volatile *lastp = &rxroot;
 		volatile s_request *req = rxroot;
@@ -291,7 +290,7 @@ BTSIG::_request(Packet& pkt,time_t timeout) {
 	uint32_t seqno;
 	s_request *req = new s_request;
 
-	pkt.set_size(pkt.offset());		// Set size of the formatted packet
+	pkt.close();				// Set size of the formatted packet
 	pkt.rewind();				// Rewind for reading packet header
 
 	pkt >> b >> seqno;			// Get cmd and seqno
@@ -422,7 +421,6 @@ BTSIG::_read(int sock,void *buffer,unsigned bytes) {
 	char buf[bytes+32];
 	Packet pkt(buf,bytes+32);
 
-printf("Requesting read of %u bytes\n",bytes);
 	pkt << uint8_t(C_Read) << _seqno() << int16_t(sock) << uint16_t(bytes);
 
 	if ( !_request(pkt,10) )
@@ -432,15 +430,11 @@ printf("Requesting read of %u bytes\n",bytes);
 	pkt.seek(5);
 	pkt >> urc;
 
-printf("Read rc = %u..\n",urc);
-
 	if ( urc != 0 )
 		return -int(urc);	// Error returned
 
 	pkt >> rdlen;
 	assert(rdlen <= bytes);
-
-printf("Read %u bytes!\n",rdlen);
 
 	if ( rdlen > 0 )
 		pkt.get(buffer,rdlen);
