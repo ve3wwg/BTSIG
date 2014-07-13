@@ -35,6 +35,7 @@ public:	Packet(void *buffer,size_t buflen);
 	inline unsigned maxsize() const		{ return maxlen; }
 	inline const void *point() const	{ return buffer + _offset; }
 
+	inline void close()			{ buflen = _offset; _offset = 0; }
 	inline void set_size(unsigned sz) 	{ buflen = sz; }
 
 	Packet& seek(unsigned new_offset);
