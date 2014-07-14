@@ -30,6 +30,8 @@ BTSIG::BTSIG() {
 	txtail = &txroot;
 	rxroot = 0;
 	rxtail = &rxroot;
+	skroot = 0;
+	sktail = &skroot;
 
 	rx_fiber = fibers.create(BTSIG::recv,0,8192);
 	tx_fiber = fibers.create(BTSIG::xmit,0,8192);
@@ -161,13 +163,11 @@ BTSIG::transmitter() {
 		}
 	}
 
-	puts("xmit ready..");
-
 	for (;;) {
 		if ( txroot != 0 ) {
-			volatile s_request *req = txroot;	// First request
-			txroot = req->next;			// Remove from tx queue
-			*rxtail = req;				// Add to receiver queue (in case we get fast reply)
+			volatile s_request *req = txroot;		// First request
+			txroot = req->next;				// Remove from tx queue
+			*rxtail = req;					// Add to receiver queue (in case we get fast reply)
 			SlipSer::write(req->pkt->data(),req->pkt->size()); // Write packet out
 printf("Request transmitted.\n");
 		} else if ( rxroot != 0 ) {
@@ -178,18 +178,25 @@ printf("Request transmitted.\n");
 			for ( ; req != 0; lastp = &req->next, req = req->next ) {
 				if ( req->reqtime + req->timeout <= now ) {
 					// This request has timed out:
-					req->seqno = _seqno();				// Assign new sequence #
-					req->reqtime = now;
-					req->pkt->seek(1u);
-					*req->pkt << uint32_t(req->seqno);		// Rewrite the sequence #
+					if ( !req->no_retry ) {
+						// Retry-able request
+						req->seqno = _seqno();		// Assign new sequence #
+						req->reqtime = now;
+						req->pkt->seek(1u);
+						*req->pkt << uint32_t(req->seqno); // Rewrite the sequence #
 printf("Retransmitting request %02X as new seqno %u\n",req->cmd,req->seqno);
-					SlipSer::write(req->pkt->data(),req->pkt->size());	// Resend request with new seqno
+						SlipSer::write(req->pkt->data(),req->pkt->size()); // Resend request with new seqno
+					} else	{
+						// This request cannot be retried- fail it
+						*lastp = req->next;		// Take this request off of the list
+						req->next = 0;
+						req->failed = true;		// Mark as a failed request (with no retry)
+						req->serviced = true;		// Mark it as finished
+					}
 				}
 			}
-			yield();
-		} else	{
-			yield();			// Nothing to do
 		}
+		yield();
 	}
 }
 
@@ -201,6 +208,62 @@ void
 BTSIG::wait_ready() {
 	while ( !f_enum )
 		yield();
+}
+
+//////////////////////////////////////////////////////////////////////
+// Create a new socket entry for open socket
+//////////////////////////////////////////////////////////////////////
+
+BTSIG::s_btsock *
+BTSIG::_new_btsock(int fd) {
+	s_btsock *btsock = new s_btsock;
+
+	btsock->fd = fd;
+	btsock->rseqno = 0;
+	btsock->wseqno = 0;
+	btsock->ack_read = false;
+	btsock->ack_write = false;
+	btsock->next = 0;
+	*sktail = btsock;
+	return btsock;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Search the list for the socket node
+//////////////////////////////////////////////////////////////////////
+
+BTSIG::s_btsock *
+BTSIG::_locate_btsock(int fd,s_btsock ***lastp) {
+
+	if ( lastp )
+		*lastp = (s_btsock **)&skroot;
+
+	for ( volatile s_btsock *node = skroot; node; node = node->next ) {
+		if ( node->fd == fd )
+			return (s_btsock *)node;
+		if ( lastp )
+			*lastp = (s_btsock **)&node->next;
+	}
+	return 0;				// Not found
+}
+
+//////////////////////////////////////////////////////////////////////
+// Delete the socket from the socket collection
+//////////////////////////////////////////////////////////////////////
+
+bool
+BTSIG::_delete_btsock(int fd) {
+	s_btsock **lastp, *node;
+
+	node = _locate_btsock(fd,&lastp);		// Locate the node
+	if ( node ) {
+		*lastp = (s_btsock *)node->next;	// Remove from the list
+		node->next = 0;
+		delete node;
+		return true;				// Located and deleted
+	}
+
+	return false;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -285,7 +348,7 @@ BTSIG::xmit(void *arg) {
 //////////////////////////////////////////////////////////////////////
 
 unsigned
-BTSIG::_request(Packet& pkt,time_t timeout) {
+BTSIG::_request(Packet& pkt,time_t timeout,bool retry) {
 	uint8_t b;
 	uint32_t seqno;
 	s_request *req = new s_request;
@@ -297,10 +360,12 @@ BTSIG::_request(Packet& pkt,time_t timeout) {
 	req->seqno = seqno;
 	req->pkt = &pkt;			// Save ref to caller's pkt and buffer
 	req->cmd = command_e(b);		// Command type
-	req->serviced = false;			// Not serviced yet
 	req->next = 0;				// No next pointer
 	req->reqtime = time();			// Time of this request
 	req->timeout = timeout;			// When it times out
+	req->serviced = false;			// Not serviced yet
+	req->no_retry = !retry;			// By default, all transactions are retry-able
+	req->failed = false;			// True if no reply is received
 
 	*txtail = req;				// Put request on the queue
 
@@ -311,9 +376,13 @@ printf("Request %02X seqno %u requested\n",b,seqno);
 
 printf("Request answered: size = %u\n",pkt.size());
 
+	bool failed = req->failed;		// Save failed status (no reply to non-retryable)
 	free(req);
 
-	return pkt.size();
+	if ( failed )
+		return 0;			// No reply to the request
+
+	return pkt.size();			// Return reply length
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -353,6 +422,9 @@ BTSIG::_socket(com_domain_e domain,sock_type_e type,int protocol) {
 	pkt.seek(5);
 	pkt >> sock;
 
+	assert(sock >= 0);
+	_new_btsock(sock);			// Allocate a s_btsock for this
+
 	return sock;
 }
 
@@ -360,6 +432,10 @@ int
 BTSIG::_connect(int sock,unsigned port,const char *address) {
 	char buf[128];
 	Packet pkt(buf,sizeof buf);	
+
+	s_btsock *btsock = _locate_btsock(sock,0);
+	if ( !btsock )
+		return -E_EBADF;		// Socket not open
 
 	pkt << uint8_t(C_Connect) << _seqno() << int16_t(sock) << int16_t(port) << address;
 
@@ -379,9 +455,18 @@ BTSIG::_close(int sock) {
 	char buf[32];
 	Packet pkt(buf,sizeof buf);
 
+	s_btsock *btsock = _locate_btsock(sock,0);
+	if ( !btsock )
+		return -E_EBADF;		// Socket not open
+
 	pkt << uint8_t(C_Close) << _seqno() << int16_t(sock);
-	if ( !_request(pkt,8) )
+
+	if ( !_request(pkt,8) ) {
+		_delete_btsock(sock);
 		return -E_EIO;
+	}
+
+	_delete_btsock(sock);
 
 	uint16_t urc;
 	pkt.seek(5);
@@ -393,16 +478,23 @@ BTSIG::_close(int sock) {
 int
 BTSIG::_write(int sock,const void *buffer,unsigned bytes) {
 
+	s_btsock *btsock = _locate_btsock(sock,0);
+	if ( !btsock )
+		return -E_EBADF;		// Socket not open
+
 	if ( bytes > MAX_IO_BYTES )
 		return -E_EINVAL;
 
 	char buf[bytes+32];
 	Packet pkt(buf,bytes+32);
 
-	pkt << uint8_t(C_Write) << _seqno() << int16_t(sock) << int16_t(bytes);
+	btsock->wseqno = _seqno();
+	btsock->ack_write = true;
+
+	pkt << uint8_t(C_Write) << uint32_t(btsock->wseqno) << int16_t(sock) << int16_t(bytes);
 	pkt.put(buffer,bytes);
 
-	if ( !_request(pkt,10) )
+	if ( !_request(pkt,10,false) )
 		return -E_EIO;
 
 	uint16_t urc, wrbytes;
@@ -415,15 +507,22 @@ BTSIG::_write(int sock,const void *buffer,unsigned bytes) {
 int
 BTSIG::_read(int sock,void *buffer,unsigned bytes) {
 
+	s_btsock *btsock = _locate_btsock(sock,0);
+	if ( !btsock )
+		return -E_EBADF;		// Socket not open
+
 	if ( bytes > MAX_IO_BYTES )
 		return -E_EINVAL;
 
 	char buf[bytes+32];
 	Packet pkt(buf,bytes+32);
 
-	pkt << uint8_t(C_Read) << _seqno() << int16_t(sock) << uint16_t(bytes);
+	btsock->rseqno = _seqno();
+	btsock->ack_read = true;
 
-	if ( !_request(pkt,10) )
+	pkt << uint8_t(C_Read) << uint32_t(btsock->rseqno) << int16_t(sock) << uint16_t(bytes);
+
+	if ( !_request(pkt,10,false) )
 		return -E_EIO;
 
 	uint16_t urc, rdlen;

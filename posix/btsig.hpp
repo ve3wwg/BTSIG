@@ -39,13 +39,27 @@ class BTSIG : public SlipSer {
 		command_e		cmd;		// Command ID
 		volatile uint32_t	seqno;		// Sequence no of this request
 		volatile s_request	*next;		// Next request
-		volatile bool		serviced;	// True when the request has been serviced
+		volatile unsigned	serviced : 1;	// True when the request has been serviced
+		volatile unsigned	no_retry : 1;	// When true, there can be no retry 
+		volatile unsigned	failed : 1;	// No reply received (and no retry)
 	};
 
 	volatile s_request	*txroot;	// Root of request queue
 	volatile s_request	**txtail;	// Ptr to tail
 	volatile s_request	*rxroot;	// Root of requests waiting a reply
 	volatile s_request	**rxtail;	// Ptr to rx tail
+
+	struct s_btsock {
+		int			fd;		// Open file descriptor
+		volatile uint32_t	rseqno;		// Sequ no that needs to be ACKed
+		volatile uint32_t	wseqno;		// Sequ no for write that needs ACK
+		volatile unsigned	ack_read : 1;	// When true, ACK prior read
+		volatile unsigned	ack_write : 1;	// When true, ACK prior write
+		volatile s_btsock	*next;
+	};
+
+	volatile s_btsock	*skroot;	// Root of open sockets list
+	volatile s_btsock	**sktail;	// Ptr to tail
 
 	void receiver();
 	void transmitter();	
@@ -54,7 +68,11 @@ class BTSIG : public SlipSer {
 
 	inline uint32_t _seqno()	{ return seqno++; }
 
-	unsigned _request(Packet& pkt,time_t timeout);
+	unsigned _request(Packet& pkt,time_t timeout,bool retry=true);
+
+	s_btsock *_new_btsock(int fd);
+	s_btsock *_locate_btsock(int fd,s_btsock ***lastp);
+	bool _delete_btsock(int fd);
 
 	int _socket(com_domain_e domain,sock_type_e type,int protocol);
 	int _connect(int sock,unsigned port,const char *address);
