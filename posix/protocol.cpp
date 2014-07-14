@@ -114,8 +114,6 @@ Protocol::socket(Packet& pkt) {
 
 	int fd = ::socket(sock_domain,sock_type,protocol);
 
-printf(" got socket fd = %d;\n",fd);
-
 	pkt.reset();
 	pkt << cmd << seqno << fd;
 	pkt.close();

@@ -219,10 +219,6 @@ BTSIG::_new_btsock(int fd) {
 	s_btsock *btsock = new s_btsock;
 
 	btsock->fd = fd;
-	btsock->rseqno = 0;
-	btsock->wseqno = 0;
-	btsock->ack_read = false;
-	btsock->ack_write = false;
 	btsock->next = 0;
 	*sktail = btsock;
 	return btsock;
@@ -340,6 +336,19 @@ BTSIG::recv(void *arg) {
 void
 BTSIG::xmit(void *arg) {
 	btsig.transmitter();
+}
+
+//////////////////////////////////////////////////////////////////////
+// Return a packet sequence number
+//////////////////////////////////////////////////////////////////////
+
+uint32_t
+BTSIG::_seqno() {
+	uint32_t s;
+
+	while ( !(s = seqno++) )
+		;				// Do not return zero
+	return s;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -488,10 +497,7 @@ BTSIG::_write(int sock,const void *buffer,unsigned bytes) {
 	char buf[bytes+32];
 	Packet pkt(buf,bytes+32);
 
-	btsock->wseqno = _seqno();
-	btsock->ack_write = true;
-
-	pkt << uint8_t(C_Write) << uint32_t(btsock->wseqno) << int16_t(sock) << int16_t(bytes);
+	pkt << uint8_t(C_Write) << _seqno() << int16_t(sock) << int16_t(bytes);
 	pkt.put(buffer,bytes);
 
 	if ( !_request(pkt,10,false) )
@@ -517,10 +523,7 @@ BTSIG::_read(int sock,void *buffer,unsigned bytes) {
 	char buf[bytes+32];
 	Packet pkt(buf,bytes+32);
 
-	btsock->rseqno = _seqno();
-	btsock->ack_read = true;
-
-	pkt << uint8_t(C_Read) << uint32_t(btsock->rseqno) << int16_t(sock) << uint16_t(bytes);
+	pkt << uint8_t(C_Read) << _seqno() << int16_t(sock) << uint16_t(bytes);
 
 	if ( !_request(pkt,10,false) )
 		return -E_EIO;

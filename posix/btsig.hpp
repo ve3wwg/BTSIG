@@ -51,10 +51,6 @@ class BTSIG : public SlipSer {
 
 	struct s_btsock {
 		int			fd;		// Open file descriptor
-		volatile uint32_t	rseqno;		// Sequ no that needs to be ACKed
-		volatile uint32_t	wseqno;		// Sequ no for write that needs ACK
-		volatile unsigned	ack_read : 1;	// When true, ACK prior read
-		volatile unsigned	ack_write : 1;	// When true, ACK prior write
 		volatile s_btsock	*next;
 	};
 
@@ -66,8 +62,7 @@ class BTSIG : public SlipSer {
 	void yield();
 	void wait_ready();
 
-	inline uint32_t _seqno()	{ return seqno++; }
-
+	uint32_t _seqno();
 	unsigned _request(Packet& pkt,time_t timeout,bool retry=true);
 
 	s_btsock *_new_btsock(int fd);
